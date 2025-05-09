@@ -7,8 +7,8 @@ import csv
 # CONFIGURACIÓN
 model = YOLO("C:/Users/david/UNI/XARXES/PROYECTE/yolov8x.pt")
 input_folder = "C:/Users/david/UNI/XARXES/PROYECTE/Frames_finals (2)/Frames_finals/1"
-output_csv = "C:/Users/david/UNI/XARXES/PROYECTE/features_kmeans_sin_porteria.csv"
-DIST_THRESHOLD = 0.05  # ahora expresado como distancia relativa (5% del ancho/alto)
+output_csv = "C:/Users/david/UNI/XARXES/PROYECTE/features_kmeans_mejorado_sin_near.csv"
+DIST_THRESHOLD = 0.05  # en proporción
 
 # FUNCIONES
 def get_normalized_center(box, img_width, img_height):
@@ -20,14 +20,22 @@ def get_normalized_center(box, img_width, img_height):
 def calculate_distance(c1, c2):
     return np.linalg.norm(np.array(c1) - np.array(c2))
 
+def normalize_box(box, img_width, img_height):
+    x1, y1, x2, y2 = box
+    x = x1 / img_width
+    y = y1 / img_height
+    w = (x2 - x1) / img_width
+    h = (y2 - y1) / img_height
+    return x, y, w, h
+
 # CREACIÓN DEL CSV
 with open(output_csv, mode="w", newline="") as file:
     writer = csv.writer(file)
     writer.writerow([
         "filename",
-        "has_ball",
-        "min_dist_to_ball",
-        "num_players_near_ball"
+        "ball_confidence",
+        "ball_x", "ball_y", "ball_w", "ball_h",
+        "min_dist_to_ball"
     ])
 
     for filename in os.listdir(input_folder):
@@ -41,33 +49,36 @@ with open(output_csv, mode="w", newline="") as file:
         results = model(frame)[0]
         boxes = results.boxes.xyxy.cpu().numpy()
         classes = results.boxes.cls.cpu().numpy().astype(int)
+        confs = results.boxes.conf.cpu().numpy()
 
-        players = [box for box, cls in zip(boxes, classes) if cls == 0]   # persona
-        balls = [box for box, cls in zip(boxes, classes) if cls == 32]   # pelota
+        players = [box for box, cls in zip(boxes, classes) if cls == 0]
+        balls_info = [(box, conf) for box, cls, conf in zip(boxes, classes, confs) if cls == 32]
 
-        has_ball = int(len(balls) > 0)
+        # Inicializar valores por defecto
+        ball_conf = 0.0
+        ball_x = ball_y = ball_w = ball_h = -1
         min_dist = -1
-        num_players_near_ball = 0
 
-        if balls and players:
-            ball_center = get_normalized_center(balls[0], width, height)
+        if balls_info:
+            ball_box, ball_conf = balls_info[0]  # usar la más confiable
+            ball_center = get_normalized_center(ball_box, width, height)
+            ball_x, ball_y, ball_w, ball_h = normalize_box(ball_box, width, height)
 
-            dists = []
-            for player in players:
-                player_center = get_normalized_center(player, width, height)
-                dist = calculate_distance(ball_center, player_center)
-                dists.append(dist)
-                if dist < DIST_THRESHOLD:
-                    num_players_near_ball += 1
+            if players:
+                dists = []
+                for player in players:
+                    player_center = get_normalized_center(player, width, height)
+                    dist = calculate_distance(ball_center, player_center)
+                    dists.append(dist)
+                min_dist = min(dists) if dists else -1
 
-            min_dist = min(dists) if dists else -1
-
-        # Escribir características al CSV
+        # Escribir vector
         writer.writerow([
             filename,
-            has_ball,
-            round(min_dist, 4),  # ahora en rango 0–1
-            num_players_near_ball
+            round(ball_conf, 4),
+            round(ball_x, 4), round(ball_y, 4),
+            round(ball_w, 4), round(ball_h, 4),
+            round(min_dist, 4)
         ])
 
 print(f"\nCSV generado en {output_csv}")
