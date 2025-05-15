@@ -1,0 +1,40 @@
+import numpy as np
+
+def get_center(box):
+    x1, y1, x2, y2 = box
+    return ((x1 + x2) / 2, (y1 + y2) / 2)
+
+def calculate_distance(c1, c2):
+    return np.linalg.norm(np.array(c1) - np.array(c2))
+
+def get_normalized_center(box, img_width, img_height):
+    x1, y1, x2, y2 = box
+    x_center = ((x1 + x2) / 2) / img_width
+    y_center = ((y1 + y2) / 2) / img_height
+    return (x_center, y_center)
+
+def normalize_box(box, img_width, img_height):
+    x1, y1, x2, y2 = box
+    x = x1 / img_width
+    y = y1 / img_height
+    w = (x2 - x1) / img_width
+    h = (y2 - y1) / img_height
+    return x, y, w, h
+
+def is_ball_between_player_and_goalpost_x(player_center, ball_center, goalpost_center):
+    """
+    Verifica si la coordenada X del balón está entre la del jugador y la portería.
+
+    Parámetros:
+    - player_center, ball_center, goalpost_center: tuplas (x,y)
+    """
+    player_x = player_center[0]
+    ball_x = ball_center[0]
+    goalpost_x = goalpost_center[0]
+
+    if player_x < goalpost_x:
+      
+        return player_x <= ball_x <= goalpost_x
+    else:
+
+        return goalpost_x <= ball_x <= player_x
