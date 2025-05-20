@@ -1,0 +1,10 @@
+data*
+.env
+proves*
+.png
+.pt
+class*
+functions*
+__pycache__
+results*
+Frames_finals_Def
